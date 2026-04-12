@@ -277,6 +277,7 @@ header .wrapper { display:flex; align-items:flex-end; justify-content:space-betw
     <button class="ex-btn" onclick="loadEx('mul')">Multiplikation</button>
     <button class="ex-btn" onclick="loadEx('if')">IF-ELSE</button>
     <button class="ex-btn" onclick="loadEx('ptr')">Pointer</button>
+    <button class="ex-btn" onclick="loadEx('flag')">Flag °</button>
   </div>
 
   <div class="grid">
@@ -359,6 +360,8 @@ Beispiel:
           <tr><td>"</td><td>Fokus-Wert ausgeben</td></tr>
           <tr><td>'</td><td>Zahl einlesen (öffnet Eingabefenster)</td></tr>
           <tr><td>?</td><td>Debug: 3 Ebenen anzeigen</td></tr>
+          <tr><td>&lt;°</td><td>IF: führe Code aus wenn linke Flag AN</td></tr>
+          <tr><td>&gt;°</td><td>IF: führe Code aus wenn rechte Flag AN</td></tr>
         </table>
       </div>
 
@@ -380,7 +383,7 @@ Beispiel:
 
 const MAX_LEVELS = 64;
 
-let grid, lvl, foc, outLines;
+let grid, lvl, foc, outLines, flags;
 // Step-Modus
 let stepToks = null, stepStack = null;
 
@@ -390,6 +393,7 @@ function initState() {
   outLines = [];
   stepToks = null;
   stepStack = null;
+  flags = [false, false];  // flags[0]=links, flags[1]=rechts
 }
 initState();
 
@@ -410,7 +414,10 @@ function tokenize(src) {
     if (c==='<') {
       i++; let n='';
       while (i<src.length && src[i]>='0' && src[i]<='9') n+=src[i++];
-      if (n) {
+      if (src[i]==='°') {
+        // <° = prüfe linke Flag
+        toks.push({t:'FLAGCHECK', side:0}); i++;
+      } else if (n) {
         if      (src[i]==='L') { toks.push({t:'FILL',side:0,ref:true,rl:0,amt:+n}); i++; }
         else if (src[i]==='R') { toks.push({t:'FILL',side:0,ref:true,rl:1,amt:+n}); i++; }
         else                   { toks.push({t:'FILL',side:0,ref:false,amt:+n}); }
@@ -418,7 +425,10 @@ function tokenize(src) {
     } else if (c==='>') {
       i++; let n='';
       while (i<src.length && src[i]>='0' && src[i]<='9') n+=src[i++];
-      if (n) {
+      if (src[i]==='°') {
+        // >° = prüfe rechte Flag
+        toks.push({t:'FLAGCHECK', side:1}); i++;
+      } else if (n) {
         if      (src[i]==='L') { toks.push({t:'FILL',side:1,ref:true,rl:0,amt:+n}); i++; }
         else if (src[i]==='R') { toks.push({t:'FILL',side:1,ref:true,rl:1,amt:+n}); i++; }
         else                   { toks.push({t:'FILL',side:1,ref:false,amt:+n}); }
@@ -434,6 +444,11 @@ function tokenize(src) {
     else if (c==="'") { toks.push({t:'INPUT'}); i++; }
     else if (c==='|') { toks.push({t:'PIPE'});  i++; }
     else if (c===':') { toks.push({t:'COL'});   i++; }
+    else if (c==='°') {
+      // ° nach < oder > wurde schon als FLAG_CHECK gemerkt
+      // Hier standalone ° – ignorieren
+      i++;
+    }
     else i++;
   }
   return toks;
@@ -448,13 +463,39 @@ function exec(toks, pos) {
       case 'RIGHT': foc=1; pos++; break;
       case 'UP':    lvl=Math.min(lvl+1,MAX_LEVELS-1); pos++; break;
       case 'DOWN':  lvl=Math.max(lvl-1,0); pos++; break;
-      case 'DROP':  grid[lvl][foc]++; pos++; break;
-      case 'REM':   if(grid[lvl][foc]>0) grid[lvl][foc]--; pos++; break;
+      case 'DROP':  grid[lvl][foc]++; flags[foc]=false; pos++; break;
+      case 'REM':
+        if (grid[lvl][foc] > 0) {
+          grid[lvl][foc]--;
+          flags[foc] = false;  // Korn ging durch → Flag AUS
+        } else {
+          flags[foc] = true;   // kein Korn → Sensor AN → Flag AN
+        }
+        pos++; break;
       case 'FILL':
         grid[lvl][t.side] = t.ref ? grid[t.amt][t.rl] : t.amt;
         foc=t.side; pos++; break;
       case 'FLIP': { let tmp=grid[lvl][0]; grid[lvl][0]=grid[lvl][1]; grid[lvl][1]=tmp; pos++; break; }
       case 'PRINT': outLines.push(String(grid[lvl][foc])); pos++; break;
+      case 'FLAGCHECK': {
+        // <° oder >° – prüfe Flag der Seite
+        // Syntax: <° CODE : → führe CODE aus wenn Flag AN, sonst überspringe bis ':'
+        pos++;
+        if (flags[t.side]) {
+          // Flag AN → Code ausführen bis ':'
+          flags[t.side] = false;  // Flag nach Abfrage löschen
+          pos = exec(toks, pos);
+        } else {
+          // Flag AUS → überspringe bis passendes ':'
+          let d=0;
+          while(pos<toks.length){
+            if(toks[pos].t==='PIPE') d++;
+            else if(toks[pos].t==='COL'){if(!d){pos++;break;}else d--;}
+            pos++;
+          }
+        }
+        break;
+      }
       case 'INPUT': {
         const val = window.prompt('FLUX Eingabe – Zahl eingeben:');
         const n = parseInt(val);
@@ -504,8 +545,12 @@ function execOne(toks, pos) {
     case 'RIGHT': foc=1; return pos+1;
     case 'UP':    lvl=Math.min(lvl+1,MAX_LEVELS-1); return pos+1;
     case 'DOWN':  lvl=Math.max(lvl-1,0); return pos+1;
-    case 'DROP':  grid[lvl][foc]++; return pos+1;
-    case 'REM':   if(grid[lvl][foc]>0) grid[lvl][foc]--; return pos+1;
+    case 'DROP':  grid[lvl][foc]++; flags[foc]=false; return pos+1;
+    case 'REM':
+      if (grid[lvl][foc]>0) { grid[lvl][foc]--; flags[foc]=false; }
+      else { flags[foc]=true; }
+      return pos+1;
+    case 'FLAGCHECK': return exec(toks, pos);
     case 'FILL':  grid[lvl][t.side] = t.ref ? grid[t.amt][t.rl] : t.amt; foc=t.side; return pos+1;
     case 'FLIP': { let tmp=grid[lvl][0]; grid[lvl][0]=grid[lvl][1]; grid[lvl][1]=tmp; return pos+1; }
     case 'PRINT': outLines.push(String(grid[lvl][foc])); return pos+1;
@@ -671,6 +716,7 @@ const examples = {
   mul: `Multiplikation: 6 x 8 = 48\n<6 + <8 - | + | + * - : ! - : + ?`,
   if:  `IF-ELSE: wenn links Sand, dann L1 sonst L2\n\n<5\n>1 < | >0 + * - : > | + + * - - :`,
   ptr: `Pointer - Variablen:\nSpeichere 3 Werte und lese sie wieder\n\n+ <25\n+ <42\n+ <99\n- - -\n<1L "\n<2L "\n<3L "`,
+  flag: `Flag System Test:\n~ setzt Flag wenn Kammer leer\n<° CODE : fuehrt aus wenn Flag AN\n\n<3 ~ ~ ~ <° " :`,
 };
 
 function loadEx(name) {
