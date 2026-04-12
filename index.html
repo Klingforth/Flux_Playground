@@ -467,10 +467,9 @@ function exec(toks, pos) {
       case 'REM':
         if (grid[lvl][foc] > 0) {
           grid[lvl][foc]--;
-          flags[foc] = false;  // Korn ging durch → Flag AUS
-        } else {
-          flags[foc] = true;   // kein Korn → Sensor AN → Flag AN
+          flags[foc] = (grid[lvl][foc] === 0);  // Flag AN wenn Kammer jetzt leer
         }
+        // wenn schon 0: Flag bleibt wie sie ist
         pos++; break;
       case 'FILL':
         grid[lvl][t.side] = t.ref ? grid[t.amt][t.rl] : t.amt;
@@ -547,8 +546,10 @@ function execOne(toks, pos) {
     case 'DOWN':  lvl=Math.max(lvl-1,0); return pos+1;
     case 'DROP':  grid[lvl][foc]++; flags[foc]=false; return pos+1;
     case 'REM':
-      if (grid[lvl][foc]>0) { grid[lvl][foc]--; flags[foc]=false; }
-      else { flags[foc]=true; }
+      if (grid[lvl][foc]>0) {
+        grid[lvl][foc]--;
+        flags[foc] = (grid[lvl][foc] === 0);
+      }
       return pos+1;
     case 'FLAGCHECK': return exec(toks, pos);
     case 'FILL':  grid[lvl][t.side] = t.ref ? grid[t.amt][t.rl] : t.amt; foc=t.side; return pos+1;
