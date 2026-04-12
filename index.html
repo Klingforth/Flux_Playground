@@ -471,6 +471,8 @@ function exec(toks, pos) {
         if (grid[lvl][foc] > 0) {
           grid[lvl][foc]--;
           flags[foc] = (grid[lvl][foc] === 0);
+        } else {
+          flags[foc] = true;  // schon leer → Flag AN
         }
         pos++; break;
       case 'FILL':
@@ -560,6 +562,8 @@ function execOne(toks, pos) {
       if (grid[lvl][foc]>0) {
         grid[lvl][foc]--;
         flags[foc] = (grid[lvl][foc] === 0);
+      } else {
+        flags[foc] = true;
       }
       return pos+1;
     case 'FLAGCHECK': return exec(toks, pos);
