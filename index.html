@@ -313,6 +313,8 @@ Beispiel:
     <div class="st-item">Fokus: <span class="st-val" id="stFoc">Links</span></div>
     <div class="st-item">Links: <span class="st-val" id="stL">0</span></div>
     <div class="st-item">Rechts: <span class="st-val" id="stR">0</span></div>
+    <div class="st-item">Flag L: <span id="flagL" style="font-size:1rem">🌑</span></div>
+    <div class="st-item">Flag R: <span id="flagR" style="font-size:1rem">🌑</span></div>
   </div>
 
   <!-- Syntax Referenz -->
@@ -647,6 +649,8 @@ function renderViz() {
   document.getElementById('stL').textContent=grid[lvl][0];
   document.getElementById('stR').textContent=grid[lvl][1];
   document.getElementById('hdrInfo').textContent=`L${lvl} · ${foc===0?'Links':'Rechts'}`;
+  document.getElementById('flagL').textContent=flags[0]?'☀️':'🌑';
+  document.getElementById('flagR').textContent=flags[1]?'☀️':'🌑';
 }
 
 function renderOut() {
